@@ -33,4 +33,4 @@ if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
   exit
 fi
 
-docker compose -f bin/lib/docker-compose.yaml run --rm cloud
+docker compose -f bin/lib/docker-compose.yaml run --service-ports --rm cloud

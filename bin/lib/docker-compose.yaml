@@ -2,6 +2,8 @@ services:
   cloud:
     stdin_open: true # docker run -i
     tty: true        # docker run -t
+    ports:
+      - 9000:9000
     image: civiform/civiform-cloud-deployment:${CIVIFORM_CLOUD_DEPLOYMENT_VERSION}
     environment:
       - AWS_ACCESS_KEY_ID
