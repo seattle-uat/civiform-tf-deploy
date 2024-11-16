@@ -269,6 +269,15 @@ export FARGATE_DESIRED_TASK_COUNT=1
 # Some legacy deployments may be using a shorter length, but going forward 64 will be the default.
 export RANDOM_PASSWORD_LENGTH=64
 
+# OPTIONAL
+# External VPC configs.
+# Some CE choose to set up VPCs outside of the Terraform configs provided by CiviForm.
+# NOTE: Must set all of them for them to take effect.
+export EXTERNAL_VPC_DATABASE_SUBNET_GROUP_NAME=""
+export EXTERNAL_VPC_ID=""
+export EXTERNAL_VPC_PRIVATE_SUBNET_IDS=[]
+export EXTERNAL_VPC_PUBLIC_SUBNET_IDS=[]
+
 
 # generic-oidc Auth configuration
 #################################################
