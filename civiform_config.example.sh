@@ -292,11 +292,6 @@ export APPLICANT_OIDC_PROVIDER_NAME="OidcClient"
 # Usually ends in .well-known/openid-configuration
 export APPLICANT_OIDC_DISCOVERY_URI="https://civiform-staging.us.auth0.com/.well-known/openid-configuration"
 
-# REQUIRED if CIVIFORM_APPLICANT_IDP="generic-oidc"
-# The URL applicants are redirected to for creating an account
-# with the identity provider.
-export APPLICANT_REGISTER_URI=""
-
 # OPTIONAL
 # The type of OIDC flow to execute, and how the data is encoded.
 # See https://auth0.com/docs/authenticate/protocols/oauth#authorization-endpoint
