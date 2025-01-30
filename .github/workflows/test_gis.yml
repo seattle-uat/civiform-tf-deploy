@@ -1,0 +1,43 @@
+name: Test GIS
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_send_teams_message:
+        type: boolean
+        description: 'Message Teams anyway'
+        default: false
+        required: false
+
+  schedule:
+    - cron: '0 * * * *'
+
+permissions: {}
+
+jobs:
+  test-gis:
+    runs-on: ubuntu-latest
+
+    env:
+      FORCE_SEND_TEAMS_MESSAGE: ${{ (github.event.inputs != null && github.event.inputs.force_send_teams_message == 'true') }}
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run gis testing script
+        run: bin/test_gis.sh
+              
+      - name: Send message to ms teams   
+        if: failure()
+        uses: dhollerbach/actions.send-message-to-ms-teams@1.0.10
+        with:
+          webhook: '${{ secrets.MICROSOFT_TEAMS_WEBHOOK_URI }}'
+          message: 'Testing GIS failed. There *may* be issues afoot. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+
+      - name: Force send test message to ms teams
+        if: (env.FORCE_SEND_TEAMS_MESSAGE == 'true')
+        uses: dhollerbach/actions.send-message-to-ms-teams@1.0.10
+        with:
+          webhook: '${{ secrets.MICROSOFT_TEAMS_WEBHOOK_URI }}'
+          message: 'Nothing is wrong. Just testing the teams connection.'

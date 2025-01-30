@@ -1,0 +1,45 @@
+name: Test API
+run-name: Test API
+
+on:
+  workflow_dispatch: 
+    inputs:
+      environment:
+        type: environment
+        default: test
+        required: true
+
+permissions: {}
+
+jobs:
+  test-api:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        run: cd qa && npm install
+
+      - name: Run
+        env:
+          BASE_URL: 'https://${{ vars.SUBDOMAIN }}.seattle.gov'
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          PROGRAM_SLUGS: ${{ secrets.PROGRAM_SLUGS }}
+        run: cd qa && npx playwright test
+
+      - name: On Failure
+        if: failure()
+        run: echo "FAILED"
+
+      # - name: Send message to ms teams   
+      #   if: failure()
+      #   uses: dhollerbach/actions.send-message-to-ms-teams@1.0.10
+      #   with:
+      #     webhook: '${{ secrets.MICROSOFT_TEAMS_WEBHOOK_URI }}'
+      #     message: 'Testing API failed. There *may* be issues with the API. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'

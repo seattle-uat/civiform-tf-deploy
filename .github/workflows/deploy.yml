@@ -1,0 +1,127 @@
+name: Seattle Deploy
+run-name: Seattle Deploy for ${{ github.event.inputs.environment || 'staging' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: environment
+        default: staging
+        required: true
+
+      deploy_enabled:
+        type: boolean
+        description: 'Deploy when checked'
+        default: true
+        required: true
+
+      probers_enabled:
+        type: boolean
+        description: 'Runs probers when checked'
+        default: false
+        required: true
+
+  schedule:
+    - cron: '0 12 1/1 * *'
+
+permissions:
+  id-token: write
+  contents: read
+
+# Two probers running at once can break each other.
+concurrency:
+  group: group-${{ github.event.inputs.environment || 'staging' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    env:
+      SKIP_CONFIRMATIONS: true
+      SKIP_USER_INPUT: true
+      SLACK_CHANNEL: 'C03UXPUEXU4'
+      # When run by the schedule github.event.inputs are not set. It's easier to normalize these here into environment variables
+      # than to have the extra logic all over and duplicated.
+      # If environment is null default to the staging site
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+      # Consider deployment to be enabled if manually checked or if run from a schedule
+      DEPLOY_ENABLED: ${{ (github.event.inputs == null || github.event.inputs.deploy_enabled == 'true') }}
+      # Consider probers to be enabled if manually checked or if run from a schedule, but only run them on the staging site
+      # beause we don't want to wipe test site data.
+      # PROBERS_ENABLED: ${{ (github.event.inputs == null || github.event.inputs.probers_enabled == 'true') && ((github.event.inputs.environment || 'staging') == 'staging')  }}
+      PROBERS_ENABLED: ${{ (github.event.inputs.probers_enabled == 'true') && ((github.event.inputs.environment || 'staging') == 'staging')  }}
+
+    steps:
+      - name: Notify Slack Start
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: ${{ env.CHANNEL_ID }}
+            text: ":space-needle: Starting Seattle Deploy\nEnv: ${{ env.ENVIRONMENT }}\nDeploy: ${{ env.DEPLOY_ENABLED }}\nProbers: ${{ env.PROBERS_ENABLED }}"
+        env:
+          CHANNEL_ID: C03UXPUEXU4
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install terraform cli
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Resolve Latest Snapshot Tag
+        run: source bin/resolve-latest-snapshot-tag
+
+      - name: Configure AWS Credentials
+        id: credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-west-2
+          role-to-assume: ${{ secrets.AWS_ROLE_IAM }}
+          output-credentials: true
+
+      - name: Get caller identity
+        run: aws sts get-caller-identity
+
+      - name: Run deployment with latest on ${{ env.ENVIRONMENT }}
+        if: (env.DEPLOY_ENABLED == 'true')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.credentials.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.credentials.outputs.aws-secret-access-key }}
+        run: bin/deploy --config="civiform_config.${{ env.ENVIRONMENT }}.sh"
+
+      - name: Run Prober tests
+        if: (env.PROBERS_ENABLED == 'true')
+        env:
+          TEST_USER_LOGIN: ${{ secrets.TEST_USER_LOGIN }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          TEST_USER_DISPLAY_NAME: 'TEST, UATAPP'
+          TEST_CIVIC_ENTITY_SHORT_NAME: '${{ vars.CIVIC_ENTITY_SHORT_NAME }}'
+          BASE_URL: 'https://${{ vars.SUBDOMAIN }}.seattle.gov'
+        run: bin/run-prober
+        
+      - name: Upload test videos and traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests videos and traces
+          retention-days: 3
+          path: |
+            tmp/html-output/
+            tmp/videos/
+
+      - name: Notify Slack Complete
+        if: always()
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}        
+          payload: |
+            channel: ${{ env.SLACK_CHANNEL }}
+            text: ":space-needle: ${{ env.STATUS_ICON }} Completed Seattle Deploy <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ job.status }}>\nVersion: ${{ env.LATEST_SNAPSHOT_TAG }}\nEnv: ${{ env.ENVIRONMENT }}\nDeploy: ${{ env.DEPLOY_ENABLED }}\nProbers: ${{ env.PROBERS_ENABLED }}"
+        env:
+          CHANNEL_ID: C03UXPUEXU4
+          STATUS_ICON: ${{fromJSON('[":no_entry:", ":white_check_mark:"]')[job.status == 'success']}}

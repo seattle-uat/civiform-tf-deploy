@@ -1,7 +1,8 @@
-civiform_config.sh
 .DS_Store
 .idea
 *.log
+*.tar
 tmp/
 nuke.yaml     # this file is created by developers when working on the deployment system. see https://docs.civiform.us/contributor-guide/developer-guide/deploy-system/prerequisites#setup-aws-nuke
 checkout/
+node_modules/

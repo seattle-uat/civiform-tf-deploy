@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+# DOC: Run the browser test suite in Docker against the staging environment.
+
+docker pull civiform/civiform-browser-test:latest
+
+docker run \
+  -v "$(pwd)/tmp:/usr/src/civiform-browser-tests/tmp" \
+  -e BASE_URL="${BASE_URL}" \
+  -e TEST_USER_AUTH_STRATEGY="seattle-staging" \
+  -e TEST_USER_LOGIN="${TEST_USER_LOGIN}" \
+  -e TEST_USER_PASSWORD="${TEST_USER_PASSWORD}" \
+  -e TEST_USER_DISPLAY_NAME="TEST, UATAPP" \
+  -e TEST_CIVIC_ENTITY_SHORT_NAME="Seattle [STAGING]" \
+  -e DISABLE_BROWSER_ERROR_WATCHER=true \
+  -e DISABLE_SCREENSHOTS=false \
+  -e CI=true \
+  civiform/civiform-browser-test:latest \
+  -c "npm install && npm test -- --grep-invert @northstar $@"
